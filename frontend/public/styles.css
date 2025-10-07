@@ -1,0 +1,231 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  --primary: #1e88e5;
+  --primary-dark: #0d47a1;
+  --border: rgba(15, 23, 42, 0.1);
+  --border-dark: rgba(148, 163, 184, 0.3);
+  --surface: #ffffff;
+  --surface-dark: #0f172a;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-on-primary: #ffffff;
+  background-color: color-mix(in srgb, var(--surface) 90%, var(--surface-dark) 10%);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  padding: 0 1.5rem 3rem;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  background: radial-gradient(circle at top, rgba(30, 136, 229, 0.08), transparent 45%);
+}
+
+.page-header {
+  padding-top: 2.5rem;
+  text-align: center;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+}
+
+.page-subtitle {
+  margin-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.filters {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, var(--border-dark) 40%);
+  box-shadow: 0 20px 45px -24px rgba(15, 23, 42, 0.3);
+  position: sticky;
+  top: 1.5rem;
+}
+
+.filters h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.filter-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-field input,
+.form-field select {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, var(--border-dark) 30%);
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(30, 136, 229, 0.15);
+  outline: none;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+button {
+  border-radius: 999px;
+  border: none;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button.primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: var(--text-on-primary);
+  box-shadow: 0 12px 28px -12px rgba(13, 71, 161, 0.6);
+}
+
+button.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 36px -16px rgba(13, 71, 161, 0.5);
+}
+
+button.secondary {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text);
+}
+
+button.secondary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.5);
+}
+
+.reports {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.reports-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.reports-list {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.report-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--border) 50%, var(--border-dark) 50%);
+  box-shadow: 0 22px 52px -32px rgba(15, 23, 42, 0.5);
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-card:hover,
+.report-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 26px 60px -28px rgba(15, 23, 42, 0.55);
+}
+
+.report-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 80%, white 20%);
+  outline-offset: 4px;
+}
+
+.report-card h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.report-card p {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+}
+
+.empty-state,
+.error-state {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--border) 40%, var(--border-dark) 60%);
+}
+
+.error-state {
+  color: #b71c1c;
+  background-color: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.4);
+}
+
+.last-updated {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 960px) {
+  body {
+    padding: 0 1rem 2rem;
+  }
+
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    position: static;
+  }
+}
+
+#reports-container[data-loading]::after {
+  content: "Loading reports…";
+  display: block;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
