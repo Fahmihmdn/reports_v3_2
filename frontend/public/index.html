@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reports Catalogue</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>Reports Catalogue</h1>
+      <p class="page-subtitle">Select a reporting period and browse available reports.</p>
+    </header>
+
+    <main>
+      <section class="filters" aria-labelledby="filters-title">
+        <h2 id="filters-title">Filters</h2>
+        <form id="filter-form" class="filter-form">
+          <div class="form-field">
+            <label for="start-date">Start date</label>
+            <input type="date" id="start-date" name="startDate" />
+          </div>
+          <div class="form-field">
+            <label for="end-date">End date</label>
+            <input type="date" id="end-date" name="endDate" />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Apply filters</button>
+            <button type="reset" class="secondary" id="reset-filters">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="reports" aria-labelledby="reports-title">
+        <div class="reports-header">
+          <h2 id="reports-title">Available reports</h2>
+          <p id="last-updated" class="last-updated" aria-live="polite"></p>
+        </div>
+        <div id="reports-container" class="reports-list" aria-live="polite"></div>
+        <div id="reports-empty" class="empty-state" hidden>
+          <p>No reports matched your filters.</p>
+        </div>
+        <div id="reports-error" class="error-state" hidden role="alert"></div>
+      </section>
+    </main>
+
+    <template id="report-card-template">
+      <a class="report-card" href="#">
+        <h3 class="report-title"></h3>
+        <p class="report-description"></p>
+      </a>
+    </template>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
