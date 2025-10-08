@@ -16,6 +16,7 @@ interface ReportDescriptor {
   metrics: Metric[];
   suggestedFilters: string[];
   url?: string;
+  openInNewTab?: boolean;
 }
 
 interface ReportsResponse {
@@ -138,7 +139,17 @@ function renderReports(reports: ReportDescriptor[]): void {
     const title = instance.querySelector<HTMLHeadingElement>(".report-title");
     const description = instance.querySelector<HTMLParagraphElement>(".report-description");
 
-    if (card) card.href = buildReportLink(report);
+    if (card) {
+      card.href = buildReportLink(report);
+
+      if (report.openInNewTab) {
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+      } else {
+        card.removeAttribute("target");
+        card.removeAttribute("rel");
+      }
+    }
     if (title) title.textContent = report.name;
     if (description) description.textContent = report.description;
 

@@ -88,8 +88,16 @@ function renderReports(reports) {
     const card = instance.querySelector(".report-card");
     const title = instance.querySelector(".report-title");
     const description = instance.querySelector(".report-description");
-    if (card)
+    if (card) {
       card.href = buildReportLink(report);
+      if (report.openInNewTab) {
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+      } else {
+        card.removeAttribute("target");
+        card.removeAttribute("rel");
+      }
+    }
     if (title)
       title.textContent = report.name;
     if (description)
