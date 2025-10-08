@@ -6,6 +6,7 @@ declare(strict_types=1);
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../lib/static_data.php';
 
 $filters = [
     'startDate' => getDateParam('startDate'),
@@ -46,11 +47,14 @@ function getDateParam(string $key): ?string
 
 function buildReportsPayload(PDO $pdo, array $filters): array
 {
-    $startDate = $filters['startDate'] ?? '1900-01-01';
-    $endDate = $filters['endDate'] ?? '2100-12-31';
+    $startDateFilter = $filters['startDate'] ?? null;
+    $endDateFilter = $filters['endDate'] ?? null;
+
+    $startDate = $startDateFilter ?? '1900-01-01';
+    $endDate = $endDateFilter ?? '2100-12-31';
 
     $reportData = [
-        buildDisbursementReport($pdo, $startDate, $endDate),
+        buildDisbursementReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildRepaymentReport($pdo, $startDate, $endDate),
         buildUpcomingScheduleReport($pdo, $endDate),
     ];
@@ -62,11 +66,14 @@ function buildReportsPayload(PDO $pdo, array $filters): array
 
 function buildStaticReportsPayload(array $filters): array
 {
-    $startDate = $filters['startDate'] ?? '1900-01-01';
-    $endDate = $filters['endDate'] ?? '2100-12-31';
+    $startDateFilter = $filters['startDate'] ?? null;
+    $endDateFilter = $filters['endDate'] ?? null;
+
+    $startDate = $startDateFilter ?? '1900-01-01';
+    $endDate = $endDateFilter ?? '2100-12-31';
 
     $reports = [
-        buildStaticDisbursementReport($startDate, $endDate),
+        buildStaticDisbursementReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticRepaymentReport($startDate, $endDate),
         buildStaticUpcomingScheduleReport($endDate),
     ];
@@ -81,7 +88,28 @@ function buildReportUrl(string $identifier): string
     return '#report-' . $identifier;
 }
 
-function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate): array
+function buildDisbursementSummaryUrl(?string $startDate, ?string $endDate): string
+{
+    $params = [];
+
+    if ($startDate) {
+        $params['startDate'] = $startDate;
+    }
+
+    if ($endDate) {
+        $params['endDate'] = $endDate;
+    }
+
+    $basePath = '/backend/reports/disbursement-summary.php';
+
+    if (empty($params)) {
+        return $basePath;
+    }
+
+    return $basePath . '?' . http_build_query($params);
+}
+
+function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $sql = <<<SQL
         SELECT
@@ -108,7 +136,8 @@ function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate): 
         'id' => 'loan-disbursement-summary',
         'name' => 'Loan Disbursement Summary',
         'description' => 'Overview of disbursement activity within the selected period.',
-        'url' => buildReportUrl('loan-disbursement-summary'),
+        'url' => buildDisbursementSummaryUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Total Disbursed',
@@ -230,7 +259,7 @@ function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
     ];
 }
 
-function buildStaticDisbursementReport(string $startDate, string $endDate): array
+function buildStaticDisbursementReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $disbursements = getStaticDisbursements();
 
@@ -253,7 +282,8 @@ function buildStaticDisbursementReport(string $startDate, string $endDate): arra
         'id' => 'loan-disbursement-summary',
         'name' => 'Loan Disbursement Summary',
         'description' => 'Overview of disbursement activity within the selected period.',
-        'url' => buildReportUrl('loan-disbursement-summary'),
+        'url' => buildDisbursementSummaryUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Total Disbursed',
@@ -371,27 +401,4 @@ function buildStaticUpcomingScheduleReport(string $endDate): array
     ];
 }
 
-function getStaticDisbursements(): array
-{
-    return [
-        ['id' => 5001, 'application_id' => 1001, 'date' => '2024-03-05', 'amount' => 5000.0],
-        ['id' => 5002, 'application_id' => 1002, 'date' => '2024-04-20', 'amount' => 12000.0],
-    ];
-}
-
-function getStaticRepayments(): array
-{
-    return [
-        ['id' => 8001, 'application_id' => 1001, 'date' => '2024-04-04', 'amount' => 2600.0, 'principal' => 2500.0, 'interest' => 100.0],
-        ['id' => 8002, 'application_id' => 1002, 'date' => '2024-05-19', 'amount' => 6100.0, 'principal' => 6000.0, 'interest' => 100.0],
-    ];
-}
-
-function getStaticPaymentSchedules(): array
-{
-    return [
-        ['id' => 7001, 'application_id' => 1001, 'date' => '2024-04-05', 'amount' => 2600.0, 'skip' => 0, 'deleted' => 0],
-        ['id' => 7002, 'application_id' => 1001, 'date' => '2024-05-05', 'amount' => 2600.0, 'skip' => 0, 'deleted' => 0],
-        ['id' => 7003, 'application_id' => 1002, 'date' => '2024-05-20', 'amount' => 6100.0, 'skip' => 0, 'deleted' => 0],
-    ];
-}
+/** Static dataset helpers are located in backend/lib/static_data.php. */
