@@ -55,7 +55,7 @@ function buildReportsPayload(PDO $pdo, array $filters): array
 
     $reportData = [
         buildDisbursementReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
-        buildRepaymentReport($pdo, $startDate, $endDate),
+        buildRepaymentReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildUpcomingScheduleReport($pdo, $endDate),
     ];
 
@@ -74,18 +74,13 @@ function buildStaticReportsPayload(array $filters): array
 
     $reports = [
         buildStaticDisbursementReport($startDate, $endDate, $startDateFilter, $endDateFilter),
-        buildStaticRepaymentReport($startDate, $endDate),
+        buildStaticRepaymentReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticUpcomingScheduleReport($endDate),
     ];
 
     return [
         'reports' => $reports,
     ];
-}
-
-function buildReportUrl(string $identifier): string
-{
-    return '#report-' . $identifier;
 }
 
 function buildDisbursementSummaryUrl(?string $startDate, ?string $endDate): string
@@ -107,6 +102,32 @@ function buildDisbursementSummaryUrl(?string $startDate, ?string $endDate): stri
     }
 
     return $basePath . '?' . http_build_query($params);
+}
+
+function buildRepaymentPerformanceUrl(?string $startDate, ?string $endDate): string
+{
+    $params = [];
+
+    if ($startDate) {
+        $params['startDate'] = $startDate;
+    }
+
+    if ($endDate) {
+        $params['endDate'] = $endDate;
+    }
+
+    $basePath = '/backend/reports/repayment-performance.php';
+
+    if (empty($params)) {
+        return $basePath;
+    }
+
+    return $basePath . '?' . http_build_query($params);
+}
+
+function buildReportUrl(string $identifier): string
+{
+    return '#report-' . $identifier;
 }
 
 function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
@@ -159,7 +180,7 @@ function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate, ?
     ];
 }
 
-function buildRepaymentReport(PDO $pdo, string $startDate, string $endDate): array
+function buildRepaymentReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $sql = <<<SQL
         SELECT
@@ -188,7 +209,8 @@ function buildRepaymentReport(PDO $pdo, string $startDate, string $endDate): arr
         'id' => 'repayment-performance',
         'name' => 'Repayment Performance',
         'description' => 'Payments received from borrowers across the selected period.',
-        'url' => buildReportUrl('repayment-performance'),
+        'url' => buildRepaymentPerformanceUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Total Repaid',
@@ -305,7 +327,7 @@ function buildStaticDisbursementReport(string $startDate, string $endDate, ?stri
     ];
 }
 
-function buildStaticRepaymentReport(string $startDate, string $endDate): array
+function buildStaticRepaymentReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $repayments = getStaticRepayments();
 
@@ -330,7 +352,8 @@ function buildStaticRepaymentReport(string $startDate, string $endDate): array
         'id' => 'repayment-performance',
         'name' => 'Repayment Performance',
         'description' => 'Payments received from borrowers across the selected period.',
-        'url' => buildReportUrl('repayment-performance'),
+        'url' => buildRepaymentPerformanceUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Total Repaid',
