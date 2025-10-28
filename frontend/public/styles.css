@@ -161,10 +161,18 @@ button.secondary:hover {
   padding: 1.5rem;
   border: 1px solid color-mix(in srgb, var(--border) 50%, var(--border-dark) 50%);
   box-shadow: 0 22px 52px -32px rgba(15, 23, 42, 0.5);
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   text-decoration: none;
   color: inherit;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .report-card:hover,
@@ -186,6 +194,39 @@ button.secondary:hover {
 .report-card p {
   margin: 0.5rem 0 0;
   color: var(--text-muted);
+}
+
+.report-metrics {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.report-metrics li {
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, var(--border-dark) 40%);
+  padding: 0.75rem 1rem;
+  background: rgba(248, 250, 252, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.report-metric-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.report-metric-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .empty-state,
