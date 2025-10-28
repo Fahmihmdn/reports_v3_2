@@ -43,6 +43,7 @@ $totalLoans = array_reduce(
 );
 $startLabel = $filters['startDate'] ? formatDisplayDate($filters['startDate']) : 'Earliest available';
 $endLabel = $filters['endDate'] ? formatDisplayDate($filters['endDate']) : 'Latest available';
+$exportFileStem = buildExportFileStem($filters['startDate'], $filters['endDate']);
 
 function getDateParam(string $key): ?string
 {
@@ -178,6 +179,21 @@ function formatDisplayDate(string $date): string
     }
 
     return $dateTime->format('j M Y');
+}
+
+function buildExportFileStem(?string $startDate, ?string $endDate): string
+{
+    $segments = ['borrower-list'];
+
+    if ($startDate !== null) {
+        $segments[] = 'from-' . preg_replace('/[^0-9]/', '', $startDate);
+    }
+
+    if ($endDate !== null) {
+        $segments[] = 'to-' . preg_replace('/[^0-9]/', '', $endDate);
+    }
+
+    return implode('_', array_filter($segments, static fn ($segment) => $segment !== null && $segment !== ''));
 }
 ?>
 <!DOCTYPE html>
@@ -434,7 +450,8 @@ function formatDisplayDate(string $date): string
     </section>
 
     <div class="actions">
-        <button type="button" id="export-csv">Export to CSV</button>
+        <button type="button" id="export-csv" data-file-stem="<?php echo htmlspecialchars($exportFileStem, ENT_QUOTES); ?>">Export to CSV</button>
+        <button type="button" id="export-pdf">Export to PDF</button>
     </div>
 
     <?php if (count($rows) === 0): ?>
@@ -492,5 +509,90 @@ function formatDisplayDate(string $date): string
         </div>
     <?php endif; ?>
 </main>
+<script>
+    (function () {
+        'use strict';
+
+        var csvButton = document.getElementById('export-csv');
+        var pdfButton = document.getElementById('export-pdf');
+
+        function buildCsvContent(table) {
+            if (!table) {
+                return '';
+            }
+
+            var headerCells = table.querySelectorAll('thead th');
+            if (!headerCells.length) {
+                return '';
+            }
+
+            var rows = [];
+            rows.push(Array.prototype.map.call(headerCells, function (cell) {
+                return cell.textContent || '';
+            }));
+
+            var bodyRows = table.querySelectorAll('tbody tr');
+            if (!bodyRows.length) {
+                return '';
+            }
+
+            Array.prototype.forEach.call(bodyRows, function (row) {
+                var cells = row.querySelectorAll('td');
+                rows.push(Array.prototype.map.call(cells, function (cell) {
+                    return cell.textContent || '';
+                }));
+            });
+
+            return rows
+                .map(function (cells) {
+                    return cells
+                        .map(function (value) {
+                            return escapeCsvValue(String(value));
+                        })
+                        .join(',');
+                })
+                .join('\r\n');
+        }
+
+        function escapeCsvValue(value) {
+            var normalized = value.replace(/\r?\n|\r/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            var needsQuotes = /[",]/.test(normalized);
+            var escaped = normalized.replace(/"/g, '""');
+            return needsQuotes ? '"' + escaped + '"' : escaped;
+        }
+
+        if (csvButton) {
+            csvButton.addEventListener('click', function () {
+                var table = document.querySelector('table');
+                var csvContent = buildCsvContent(table);
+
+                if (!csvContent) {
+                    window.alert('No data available to export.');
+                    return;
+                }
+
+                var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                var url = window.URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                var fileStem = csvButton.getAttribute('data-file-stem') || 'borrower-list';
+
+                link.href = url;
+                link.download = fileStem + '.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            });
+        }
+
+        if (pdfButton) {
+            pdfButton.addEventListener('click', function () {
+                window.print();
+            });
+        }
+    })();
+</script>
 </body>
 </html>
