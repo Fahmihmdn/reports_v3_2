@@ -250,3 +250,106 @@ if (!function_exists('getStaticApplications')) {
         ];
     }
 }
+
+if (!function_exists('getStaticBorrowerLoanSummaries')) {
+    function getStaticBorrowerLoanSummaries(string $startDate, string $endDate): array
+    {
+        $disbursements = getStaticDisbursements();
+        $applications = getStaticApplications();
+        $borrowers = getStaticBorrowers();
+
+        $applicationIndex = [];
+        foreach ($applications as $application) {
+            if (!isset($application['id'])) {
+                continue;
+            }
+
+            $applicationIndex[(int) $application['id']] = $application;
+        }
+
+        $borrowerIndex = [];
+        foreach ($borrowers as $borrower) {
+            if (!isset($borrower['id'])) {
+                continue;
+            }
+
+            $borrowerIndex[(int) $borrower['id']] = $borrower;
+        }
+
+        $summaries = [];
+
+        foreach ($disbursements as $disbursement) {
+            $date = $disbursement['date'] ?? null;
+            if ($date === null || $date < $startDate || $date > $endDate) {
+                continue;
+            }
+
+            $applicationId = (int) ($disbursement['application_id'] ?? 0);
+            $application = $applicationIndex[$applicationId] ?? null;
+            if ($application === null || ($application['deleted'] ?? 0) === 1) {
+                continue;
+            }
+
+            $borrowerId = (int) ($application['borrower_id'] ?? 0);
+            $borrower = $borrowerIndex[$borrowerId] ?? null;
+            if ($borrower === null) {
+                continue;
+            }
+
+            if (!isset($summaries[$borrowerId])) {
+                $summaries[$borrowerId] = [
+                    'borrower_id' => $borrowerId,
+                    'uid' => $borrower['uid'] ?? null,
+                    'name' => $borrower['name'] ?? null,
+                    'gender' => $borrower['gender'] ?? null,
+                    'dob' => $borrower['dob'] ?? null,
+                    'annual_income' => isset($borrower['annual_income']) ? (float) $borrower['annual_income'] : null,
+                    'blk' => $borrower['blk'] ?? null,
+                    'street' => $borrower['street'] ?? null,
+                    'unit' => $borrower['unit'] ?? null,
+                    'building' => $borrower['building'] ?? null,
+                    'pincode' => $borrower['pincode'] ?? null,
+                    'address1' => $borrower['address1'] ?? null,
+                    'email' => $borrower['email'] ?? null,
+                    'hand_phone' => $borrower['hand_phone'] ?? null,
+                    'loan_count' => 0,
+                    'total_loan_amount' => 0.0,
+                    'first_loan_date' => null,
+                    'last_loan_date' => null,
+                ];
+            }
+
+            $summary = $summaries[$borrowerId];
+            $summary['loan_count']++;
+            $summary['total_loan_amount'] += (float) ($disbursement['amount'] ?? 0.0);
+
+            $loanDate = $disbursement['date'] ?? null;
+            if ($loanDate !== null) {
+                if ($summary['first_loan_date'] === null || $loanDate < $summary['first_loan_date']) {
+                    $summary['first_loan_date'] = $loanDate;
+                }
+
+                if ($summary['last_loan_date'] === null || $loanDate > $summary['last_loan_date']) {
+                    $summary['last_loan_date'] = $loanDate;
+                }
+            }
+
+            $summaries[$borrowerId] = $summary;
+        }
+
+        $results = array_values($summaries);
+        usort(
+            $results,
+            static function (array $left, array $right): int {
+                $nameComparison = strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));
+                if ($nameComparison !== 0) {
+                    return $nameComparison;
+                }
+
+                return ($left['borrower_id'] ?? 0) <=> ($right['borrower_id'] ?? 0);
+            }
+        );
+
+        return $results;
+    }
+}
