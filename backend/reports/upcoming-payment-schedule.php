@@ -79,7 +79,6 @@ function fetchUpcomingScheduleDetails(PDO $pdo, string $startDate, string $endDa
         WHERE ps.skip = 0
             AND ps.deleted = 0
             AND ps.date IS NOT NULL
-            AND ps.date > CURRENT_DATE()
             AND ps.date BETWEEN :startDate AND :endDate
         ORDER BY ps.date ASC, ps.id ASC
     SQL;
@@ -149,8 +148,6 @@ function buildStaticUpcomingScheduleDetails(string $startDate, string $endDate):
         $borrowerIndex[(int) $borrower['id']] = $borrower;
     }
 
-    $today = (new DateTimeImmutable('now'))->format('Y-m-d');
-
     $results = [];
 
     foreach ($schedules as $schedule) {
@@ -159,7 +156,7 @@ function buildStaticUpcomingScheduleDetails(string $startDate, string $endDate):
         }
 
         $date = $schedule['date'] ?? null;
-        if ($date === null || $date <= $today || $date < $startDate || $date > $endDate) {
+        if ($date === null || $date < $startDate || $date > $endDate) {
             continue;
         }
 

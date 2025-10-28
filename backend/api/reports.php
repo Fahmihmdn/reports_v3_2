@@ -288,8 +288,7 @@ function buildUpcomingScheduleReport(PDO $pdo, string $startDate, string $endDat
             COUNT(DISTINCT ps.id) AS upcoming_payments,
             COALESCE(SUM(ps.amount), 0) AS scheduled_amount
         FROM payment_schedule ps
-        WHERE ps.date > CURRENT_DATE()
-            AND ps.date BETWEEN :startDate AND :endDate
+        WHERE ps.date BETWEEN :startDate AND :endDate
             AND ps.skip = 0
             AND ps.deleted = 0
     SQL;
@@ -308,7 +307,7 @@ function buildUpcomingScheduleReport(PDO $pdo, string $startDate, string $endDat
     return [
         'id' => 'upcoming-payment-schedule',
         'name' => 'Upcoming Payment Schedule',
-        'description' => 'Payments scheduled after today within the selected date range.',
+        'description' => 'Payments scheduled within the selected date range.',
         'url' => buildUpcomingScheduleUrl($startDateFilter, $endDateFilter),
         'openInNewTab' => true,
         'metrics' => [
@@ -484,8 +483,6 @@ function buildStaticUpcomingScheduleReport(string $startDate, string $endDate, ?
 {
     $schedules = getStaticPaymentSchedules();
 
-    $today = (new DateTimeImmutable('now'))->format('Y-m-d');
-
     $count = 0;
     $total = 0.0;
 
@@ -495,7 +492,7 @@ function buildStaticUpcomingScheduleReport(string $startDate, string $endDate, ?
         }
 
         $date = $schedule['date'];
-        if ($date <= $today || $date < $startDate || $date > $endDate) {
+        if ($date < $startDate || $date > $endDate) {
             continue;
         }
 
@@ -506,7 +503,7 @@ function buildStaticUpcomingScheduleReport(string $startDate, string $endDate, ?
     return [
         'id' => 'upcoming-payment-schedule',
         'name' => 'Upcoming Payment Schedule',
-        'description' => 'Payments scheduled after today within the selected date range.',
+        'description' => 'Payments scheduled within the selected date range.',
         'url' => buildUpcomingScheduleUrl($startDateFilter, $endDateFilter),
         'openInNewTab' => true,
         'metrics' => [
