@@ -59,6 +59,7 @@ function buildReportsPayload(PDO $pdo, array $filters): array
         buildUpcomingScheduleReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildAllLoansReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildBorrowerListReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
+        buildActiveLoansReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
     return [
@@ -80,6 +81,7 @@ function buildStaticReportsPayload(array $filters): array
         buildStaticUpcomingScheduleReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticAllLoansReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticBorrowerListReport($startDate, $endDate, $startDateFilter, $endDateFilter),
+        buildStaticActiveLoansReport($startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
     return [
@@ -189,6 +191,27 @@ function buildBorrowerListUrl(?string $startDate, ?string $endDate): string
     }
 
     $basePath = '/backend/reports/borrower-list.php';
+
+    if (empty($params)) {
+        return $basePath;
+    }
+
+    return $basePath . '?' . http_build_query($params);
+}
+
+function buildActiveLoansReportUrl(?string $startDate, ?string $endDate): string
+{
+    $params = [];
+
+    if ($startDate) {
+        $params['startDate'] = $startDate;
+    }
+
+    if ($endDate) {
+        $params['endDate'] = $endDate;
+    }
+
+    $basePath = '/backend/reports/active-loans-report.php';
 
     if (empty($params)) {
         return $basePath;
@@ -422,6 +445,48 @@ function buildBorrowerListReport(PDO $pdo, string $startDate, string $endDate, ?
             COALESCE(SUM(total_loan_amount), 0) AS total_loan_amount,
             COALESCE(SUM(loan_count), 0) AS total_loans
         FROM borrower_totals
+function buildActiveLoansReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
+{
+    $sql = <<<SQL
+        WITH repayment_summary AS (
+            SELECT
+                r.disbursement_id,
+                COALESCE(SUM(r.principal), 0) AS total_principal,
+                COALESCE(SUM(r.amount), 0) AS total_amount,
+                MAX(r.date) AS last_payment_date
+            FROM repayments r
+            WHERE r.deleted = 0
+                AND (r.cheque_dishonour IS NULL OR r.cheque_dishonour != '1')
+            GROUP BY r.disbursement_id
+        )
+        SELECT
+            COUNT(*) AS loan_count,
+            COALESCE(SUM(d.amount), 0) AS total_disbursed,
+            COALESCE(SUM(rep.total_principal), 0) AS total_repaid,
+            COALESCE(SUM(GREATEST(d.amount - COALESCE(rep.total_principal, 0), 0)), 0) AS total_outstanding,
+            SUM(
+                CASE
+                    WHEN rep.last_payment_date IS NOT NULL
+                        AND rep.last_payment_date BETWEEN :startDate AND :endDate
+                    THEN 1 ELSE 0
+                END
+            ) AS recent_payments
+        FROM disbursements d
+        LEFT JOIN applications ap ON d.application_id = ap.id
+        LEFT JOIN repayment_summary rep ON rep.disbursement_id = d.id
+        WHERE ap.deleted = 0
+            AND (ap.loan_status_id IS NULL OR ap.loan_status_id NOT IN ('Cancelled', 'Canceled', 'Rejected'))
+            AND (
+                GREATEST(d.amount - COALESCE(rep.total_principal, 0), 0) > 0
+                OR (rep.last_payment_date IS NOT NULL AND rep.last_payment_date BETWEEN :startDate AND :endDate)
+                OR (COALESCE(d.status, '') IN ('Active', 'Pending'))
+                OR (COALESCE(ap.loan_status_id, '') IN ('Active', 'Pending'))
+            )
+            AND (
+                d.date BETWEEN :startDate AND :endDate
+                OR (rep.last_payment_date IS NOT NULL AND rep.last_payment_date BETWEEN :startDate AND :endDate)
+                OR GREATEST(d.amount - COALESCE(rep.total_principal, 0), 0) > 0
+            )
     SQL;
 
     $statement = $pdo->prepare($sql);
@@ -457,6 +522,150 @@ function buildBorrowerListReport(PDO $pdo, string $startDate, string $endDate, ?
                 'label' => 'Total Loans',
                 'value' => (int) $result['total_loans'],
                 'formatted' => (int) $result['total_loans'],
+    $result = $statement->fetch() ?: [
+        'loan_count' => 0,
+        'total_disbursed' => 0,
+        'total_repaid' => 0,
+        'total_outstanding' => 0,
+        'recent_payments' => 0,
+    ];
+
+    return [
+        'id' => 'active-loans-report',
+        'name' => 'Active Loans Report',
+        'description' => 'Shows loans that still carry balances or recent repayment activity.',
+        'url' => buildActiveLoansReportUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
+        'metrics' => [
+            [
+                'label' => 'Outstanding Principal',
+                'value' => (float) $result['total_outstanding'],
+                'formatted' => number_format((float) $result['total_outstanding'], 2),
+            ],
+            [
+                'label' => 'Active Loans',
+                'value' => (int) $result['loan_count'],
+                'formatted' => (int) $result['loan_count'],
+            ],
+            [
+                'label' => 'Recent Payments',
+                'value' => (int) $result['recent_payments'],
+                'formatted' => (int) $result['recent_payments'],
+            ],
+        ],
+        'suggestedFilters' => ['startDate', 'endDate'],
+    ];
+}
+
+function buildStaticActiveLoansReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
+{
+    $disbursements = getStaticDisbursements();
+    $applications = getStaticApplications();
+    $repayments = getStaticRepayments();
+
+    $applicationIndex = [];
+    foreach ($applications as $application) {
+        if (!isset($application['id'])) {
+            continue;
+        }
+
+        $applicationIndex[(int) $application['id']] = $application;
+    }
+
+    $repaymentsByDisbursement = [];
+    foreach ($repayments as $repayment) {
+        if (($repayment['deleted'] ?? 0) === 1 || ($repayment['cheque_dishonour'] ?? '0') === '1') {
+            continue;
+        }
+
+        $disbursementId = (int) ($repayment['disbursement_id'] ?? 0);
+        if ($disbursementId === 0) {
+            continue;
+        }
+
+        if (!isset($repaymentsByDisbursement[$disbursementId])) {
+            $repaymentsByDisbursement[$disbursementId] = [];
+        }
+
+        $repaymentsByDisbursement[$disbursementId][] = $repayment;
+    }
+
+    $loanCount = 0;
+    $totalDisbursed = 0.0;
+    $totalOutstanding = 0.0;
+    $recentPayments = 0;
+
+    foreach ($disbursements as $disbursement) {
+        $disbursementId = (int) ($disbursement['id'] ?? 0);
+        $applicationId = (int) ($disbursement['application_id'] ?? 0);
+        $application = $applicationIndex[$applicationId] ?? null;
+
+        if ($application === null || ($application['deleted'] ?? 0) === 1) {
+            continue;
+        }
+
+        $loanAmount = (float) ($disbursement['amount'] ?? 0.0);
+        $repaymentList = $repaymentsByDisbursement[$disbursementId] ?? [];
+
+        $principalRepaid = 0.0;
+        $lastPaymentDate = null;
+
+        foreach ($repaymentList as $repayment) {
+            $principalRepaid += (float) ($repayment['principal'] ?? 0.0);
+            $datePaid = $repayment['date'] ?? null;
+            if ($datePaid !== null && ($lastPaymentDate === null || $datePaid > $lastPaymentDate)) {
+                $lastPaymentDate = $datePaid;
+            }
+        }
+
+        $outstanding = max($loanAmount - $principalRepaid, 0.0);
+        $status = $disbursement['status'] ?? null;
+        $applicationStatus = $application['loan_status_id'] ?? null;
+
+        $recentPayment = $lastPaymentDate !== null && $lastPaymentDate >= $startDate && $lastPaymentDate <= $endDate;
+        $isActiveStatus = in_array($status, ['Active', 'Pending'], true) || in_array($applicationStatus, ['Active', 'Pending'], true);
+
+        $loanDate = $disbursement['date'] ?? null;
+        $withinRange = ($loanDate !== null && $loanDate >= $startDate && $loanDate <= $endDate) || $recentPayment || $outstanding > 0.0;
+
+        if (!$recentPayment && !$isActiveStatus && $outstanding <= 0.0) {
+            continue;
+        }
+
+        if (!$withinRange) {
+            continue;
+        }
+
+        $loanCount++;
+        $totalDisbursed += $loanAmount;
+        $totalOutstanding += $outstanding;
+
+        if ($recentPayment) {
+            $recentPayments++;
+        }
+    }
+
+    return [
+        'id' => 'active-loans-report',
+        'name' => 'Active Loans Report',
+        'description' => 'Shows loans that still carry balances or recent repayment activity.',
+        'url' => buildActiveLoansReportUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
+        'metrics' => [
+            [
+                'label' => 'Outstanding Principal',
+                'value' => $totalOutstanding,
+                'formatted' => number_format($totalOutstanding, 2),
+            ],
+            [
+                'label' => 'Active Loans',
+                'value' => $loanCount,
+                'formatted' => $loanCount,
+            ],
+            [
+                'label' => 'Recent Payments',
+                'value' => $recentPayments,
+                'formatted' => $recentPayments,
             ],
         ],
         'suggestedFilters' => ['startDate', 'endDate'],
