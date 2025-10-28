@@ -56,7 +56,7 @@ function buildReportsPayload(PDO $pdo, array $filters): array
     $reportData = [
         buildDisbursementReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildRepaymentReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
-        buildUpcomingScheduleReport($pdo, $endDate),
+        buildUpcomingScheduleReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildAllLoansReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
@@ -76,7 +76,7 @@ function buildStaticReportsPayload(array $filters): array
     $reports = [
         buildStaticDisbursementReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticRepaymentReport($startDate, $endDate, $startDateFilter, $endDateFilter),
-        buildStaticUpcomingScheduleReport($endDate),
+        buildStaticUpcomingScheduleReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticAllLoansReport($startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
@@ -130,6 +130,27 @@ function buildRepaymentPerformanceUrl(?string $startDate, ?string $endDate): str
 function buildReportUrl(string $identifier): string
 {
     return '#report-' . $identifier;
+}
+
+function buildUpcomingScheduleUrl(?string $startDate, ?string $endDate): string
+{
+    $params = [];
+
+    if ($startDate) {
+        $params['startDate'] = $startDate;
+    }
+
+    if ($endDate) {
+        $params['endDate'] = $endDate;
+    }
+
+    $basePath = '/backend/reports/upcoming-payment-schedule.php';
+
+    if (empty($params)) {
+        return $basePath;
+    }
+
+    return $basePath . '?' . http_build_query($params);
 }
 
 function buildAllLoansReportUrl(?string $startDate, ?string $endDate): string
@@ -260,7 +281,7 @@ function buildRepaymentReport(PDO $pdo, string $startDate, string $endDate, ?str
     ];
 }
 
-function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
+function buildUpcomingScheduleReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $sql = <<<SQL
         SELECT
@@ -268,13 +289,14 @@ function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
             COALESCE(SUM(ps.amount), 0) AS scheduled_amount
         FROM payment_schedule ps
         WHERE ps.date > CURRENT_DATE()
-            AND ps.date <= :endDate
+            AND ps.date BETWEEN :startDate AND :endDate
             AND ps.skip = 0
             AND ps.deleted = 0
     SQL;
 
     $statement = $pdo->prepare($sql);
     $statement->execute([
+        'startDate' => $startDate,
         'endDate' => $endDate,
     ]);
 
@@ -286,8 +308,9 @@ function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
     return [
         'id' => 'upcoming-payment-schedule',
         'name' => 'Upcoming Payment Schedule',
-        'description' => 'Payments scheduled after today up to the selected end date.',
-        'url' => buildReportUrl('upcoming-payment-schedule'),
+        'description' => 'Payments scheduled after today within the selected date range.',
+        'url' => buildUpcomingScheduleUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Scheduled Amount',
@@ -300,7 +323,7 @@ function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
                 'formatted' => (int) $result['upcoming_payments'],
             ],
         ],
-        'suggestedFilters' => ['endDate'],
+        'suggestedFilters' => ['startDate', 'endDate'],
     ];
 }
 
@@ -457,7 +480,7 @@ function buildStaticRepaymentReport(string $startDate, string $endDate, ?string 
     ];
 }
 
-function buildStaticUpcomingScheduleReport(string $endDate): array
+function buildStaticUpcomingScheduleReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $schedules = getStaticPaymentSchedules();
 
@@ -472,7 +495,7 @@ function buildStaticUpcomingScheduleReport(string $endDate): array
         }
 
         $date = $schedule['date'];
-        if ($date <= $today || $date > $endDate) {
+        if ($date <= $today || $date < $startDate || $date > $endDate) {
             continue;
         }
 
@@ -483,8 +506,9 @@ function buildStaticUpcomingScheduleReport(string $endDate): array
     return [
         'id' => 'upcoming-payment-schedule',
         'name' => 'Upcoming Payment Schedule',
-        'description' => 'Payments scheduled after today up to the selected end date.',
-        'url' => buildReportUrl('upcoming-payment-schedule'),
+        'description' => 'Payments scheduled after today within the selected date range.',
+        'url' => buildUpcomingScheduleUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
         'metrics' => [
             [
                 'label' => 'Scheduled Amount',
@@ -497,7 +521,7 @@ function buildStaticUpcomingScheduleReport(string $endDate): array
                 'formatted' => $count,
             ],
         ],
-        'suggestedFilters' => ['endDate'],
+        'suggestedFilters' => ['startDate', 'endDate'],
     ];
 }
 
