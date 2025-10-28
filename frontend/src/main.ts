@@ -138,6 +138,7 @@ function renderReports(reports: ReportDescriptor[]): void {
     const card = instance.querySelector<HTMLAnchorElement>(".report-card");
     const title = instance.querySelector<HTMLHeadingElement>(".report-title");
     const description = instance.querySelector<HTMLParagraphElement>(".report-description");
+    const metricsList = instance.querySelector<HTMLUListElement>(".report-metrics");
 
     if (card) {
       card.href = buildReportLink(report);
@@ -152,6 +153,26 @@ function renderReports(reports: ReportDescriptor[]): void {
     }
     if (title) title.textContent = report.name;
     if (description) description.textContent = report.description;
+    if (metricsList) {
+      const metrics = report.metrics.slice(0, 3);
+      metricsList.innerHTML = "";
+      metrics.forEach((metric) => {
+        const item = document.createElement("li");
+        const label = document.createElement("span");
+        label.className = "report-metric-label";
+        label.textContent = metric.label;
+
+        const value = document.createElement("span");
+        value.className = "report-metric-value";
+        const formatted = typeof metric.formatted === "number" ? metric.formatted.toLocaleString() : String(metric.formatted);
+        value.textContent = formatted;
+
+        item.append(label, value);
+        metricsList.append(item);
+      });
+
+      metricsList.hidden = metrics.length === 0;
+    }
 
     fragment.append(instance);
   });

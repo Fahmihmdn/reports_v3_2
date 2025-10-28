@@ -57,6 +57,7 @@ function buildReportsPayload(PDO $pdo, array $filters): array
         buildDisbursementReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildRepaymentReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
         buildUpcomingScheduleReport($pdo, $endDate),
+        buildAllLoansReport($pdo, $startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
     return [
@@ -76,6 +77,7 @@ function buildStaticReportsPayload(array $filters): array
         buildStaticDisbursementReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticRepaymentReport($startDate, $endDate, $startDateFilter, $endDateFilter),
         buildStaticUpcomingScheduleReport($endDate),
+        buildStaticAllLoansReport($startDate, $endDate, $startDateFilter, $endDateFilter),
     ];
 
     return [
@@ -128,6 +130,27 @@ function buildRepaymentPerformanceUrl(?string $startDate, ?string $endDate): str
 function buildReportUrl(string $identifier): string
 {
     return '#report-' . $identifier;
+}
+
+function buildAllLoansReportUrl(?string $startDate, ?string $endDate): string
+{
+    $params = [];
+
+    if ($startDate) {
+        $params['startDate'] = $startDate;
+    }
+
+    if ($endDate) {
+        $params['endDate'] = $endDate;
+    }
+
+    $basePath = '/backend/reports/all-loans-report.php';
+
+    if (empty($params)) {
+        return $basePath;
+    }
+
+    return $basePath . '?' . http_build_query($params);
 }
 
 function buildDisbursementReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
@@ -281,6 +304,60 @@ function buildUpcomingScheduleReport(PDO $pdo, string $endDate): array
     ];
 }
 
+function buildAllLoansReport(PDO $pdo, string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
+{
+    $sql = <<<SQL
+        SELECT
+            COUNT(*) AS loan_count,
+            COUNT(DISTINCT b.uid) AS borrower_count,
+            COALESCE(SUM(d.amount), 0) AS total_amount
+        FROM disbursements d
+        LEFT JOIN applications ap ON d.application_id = ap.id
+        LEFT JOIN borrowers b ON ap.borrower_id = b.id
+        WHERE ap.deleted = 0
+            AND d.date IS NOT NULL
+            AND d.date BETWEEN :startDate AND :endDate
+    SQL;
+
+    $statement = $pdo->prepare($sql);
+    $statement->execute([
+        'startDate' => $startDate,
+        'endDate' => $endDate,
+    ]);
+
+    $result = $statement->fetch() ?: [
+        'loan_count' => 0,
+        'borrower_count' => 0,
+        'total_amount' => 0,
+    ];
+
+    return [
+        'id' => 'all-loans-report',
+        'name' => 'All Loans Report',
+        'description' => 'Detailed listing of loans alongside borrower contact information.',
+        'url' => buildAllLoansReportUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
+        'metrics' => [
+            [
+                'label' => 'Total Loan Amount',
+                'value' => (float) $result['total_amount'],
+                'formatted' => number_format((float) $result['total_amount'], 2),
+            ],
+            [
+                'label' => 'Loan Count',
+                'value' => (int) $result['loan_count'],
+                'formatted' => (int) $result['loan_count'],
+            ],
+            [
+                'label' => 'Unique Borrowers',
+                'value' => (int) $result['borrower_count'],
+                'formatted' => (int) $result['borrower_count'],
+            ],
+        ],
+        'suggestedFilters' => ['startDate', 'endDate'],
+    ];
+}
+
 function buildStaticDisbursementReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
 {
     $disbursements = getStaticDisbursements();
@@ -421,6 +498,86 @@ function buildStaticUpcomingScheduleReport(string $endDate): array
             ],
         ],
         'suggestedFilters' => ['endDate'],
+    ];
+}
+
+function buildStaticAllLoansReport(string $startDate, string $endDate, ?string $startDateFilter = null, ?string $endDateFilter = null): array
+{
+    $disbursements = getStaticDisbursements();
+    $applications = getStaticApplications();
+    $borrowers = getStaticBorrowers();
+
+    $applicationIndex = [];
+    foreach ($applications as $application) {
+        if (!isset($application['id'])) {
+            continue;
+        }
+
+        $applicationIndex[(int) $application['id']] = $application;
+    }
+
+    $borrowerIndex = [];
+    foreach ($borrowers as $borrower) {
+        if (!isset($borrower['id'])) {
+            continue;
+        }
+
+        $borrowerIndex[(int) $borrower['id']] = $borrower;
+    }
+
+    $loanCount = 0;
+    $totalAmount = 0.0;
+    $borrowerKeys = [];
+
+    foreach ($disbursements as $disbursement) {
+        $date = $disbursement['date'] ?? null;
+        if ($date === null || $date < $startDate || $date > $endDate) {
+            continue;
+        }
+
+        $applicationId = (int) ($disbursement['application_id'] ?? 0);
+        $application = $applicationIndex[$applicationId] ?? null;
+        if ($application === null || ($application['deleted'] ?? 0) === 1) {
+            continue;
+        }
+
+        $loanCount++;
+        $totalAmount += (float) ($disbursement['amount'] ?? 0.0);
+
+        $borrowerId = (int) ($application['borrower_id'] ?? 0);
+        $borrower = $borrowerIndex[$borrowerId] ?? null;
+        $borrowerKey = $borrower['uid'] ?? ($borrowerId > 0 ? (string) $borrowerId : null);
+        if ($borrowerKey !== null && $borrowerKey !== '') {
+            $borrowerKeys[$borrowerKey] = true;
+        }
+    }
+
+    $borrowerCount = count($borrowerKeys);
+
+    return [
+        'id' => 'all-loans-report',
+        'name' => 'All Loans Report',
+        'description' => 'Detailed listing of loans alongside borrower contact information.',
+        'url' => buildAllLoansReportUrl($startDateFilter, $endDateFilter),
+        'openInNewTab' => true,
+        'metrics' => [
+            [
+                'label' => 'Total Loan Amount',
+                'value' => $totalAmount,
+                'formatted' => number_format($totalAmount, 2),
+            ],
+            [
+                'label' => 'Loan Count',
+                'value' => $loanCount,
+                'formatted' => $loanCount,
+            ],
+            [
+                'label' => 'Unique Borrowers',
+                'value' => $borrowerCount,
+                'formatted' => $borrowerCount,
+            ],
+        ],
+        'suggestedFilters' => ['startDate', 'endDate'],
     ];
 }
 
